@@ -1,0 +1,122 @@
+{
+  "ethereum": {
+    "chainId": "0x1",
+    "chainName": "ETH Mainnet",
+    "rpcUrls": ["https://eth-mainnet.g.alchemy.com/v2/KdzaJDw7T0CIlJEC6LQ3nwAYkMiPN4oU"],
+    "blockExplorerUrls": ["https://etherscan.io/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    }
+  },
+  "bsc": {
+    "chainId": "0x38",
+    "chainName": "BSC Mainnet",
+    "rpcUrls": ["https://bsc-dataseed.binance.org/"],
+    "blockExplorerUrls": ["https://bscscan.com/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "BNB",
+      "symbol": "BNB",
+      "decimals": 18
+    }
+  },
+  "arbitrum": {
+    "chainId": "0xa4b1",
+    "chainName": "Arbitrum",
+    "rpcUrls": ["https://arb1.arbitrum.io/rpc"],
+    "blockExplorerUrls": ["https://arbiscan.io/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    }
+  },
+  "polygon": {
+    "chainId": "0x89",
+    "chainName": "Polygon",
+    "rpcUrls": ["https://polygon-rpc.com/"],
+    "blockExplorerUrls": ["https://polygonscan.com/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "MATIC",
+      "symbol": "MATIC",
+      "decimals": 18
+    }
+  },
+  "rinkeby": {
+    "chainId": "0x4",
+    "chainName": "Rinkeby",
+    "rpcUrls": ["https://eth-rinkeby.nodereal.io/v1/c6096a325817442293c2c087635febd2"],
+    "blockExplorerUrls": ["https://rinkeby.etherscan.io/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    }
+  },
+  "bsc-testnet": {
+    "chainId": "0x61",
+    "chainName": "BSC Testnet",
+    "rpcUrls": ["https://bsc-testnet.nodereal.io/v1/1ea52fb7d6064aa7a23c7a32ff028cd1"],
+    "blockExplorerUrls": ["https://testnet.bscscan.com"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "BNB",
+      "symbol": "BNB",
+      "decimals": 18
+    }
+  },
+  "arbitrum-rinkeby": {
+    "chainId": "0x66eeb",
+    "chainName": "Arbitrum Rinkeby",
+    "rpcUrls": ["https://arb-rinkeby.g.alchemy.com/v2/Yr9cj7hOjdCpJOhtInrPG7Kie1-ce5gi"],
+    "blockExplorerUrls": ["https://testnet.arbiscan.io/"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    }
+  },
+  "mumbai": {
+    "chainId": "0x13881",
+    "chainName": "Polygon Mumbai",
+    "rpcUrls": ["https://polygon-mumbai.g.alchemy.com/v2/6LV-C6MIfR4cgl7cd14rlgBZZX0-eYBK"],
+    "blockExplorerUrls": ["https://mumbai.polygonscan.com"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "MATIC",
+      "symbol": "MATIC",
+      "decimals": 18
+    }
+  },
+  "cfx-espace-test": {
+    "chainId": "0x47",
+    "chainName": "Conflux eSpace Testnet",
+    "rpcUrls": ["https://evmtestnet.confluxrpc.com"],
+    "blockExplorerUrls": ["https://evmtestnet.confluxscan.net"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "CFX",
+      "symbol": "CFX",
+      "decimals": 18
+    }
+  },
+  "wedid_dev": {
+    "chainId": "0x796",
+    "chainName": "WeDID Chain Testnet",
+    "rpcUrls": ["https://devchain.nawarat.io"],
+    "blockExplorerUrls": ["http://localhost:9933"],
+    "iconUrls": [],
+    "nativeCurrency": {
+      "name": "TEST",
+      "symbol": "TEST",
+      "decimals": 18
+    }
+  }
+}

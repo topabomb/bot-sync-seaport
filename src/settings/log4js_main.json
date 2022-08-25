@@ -1,0 +1,22 @@
+{
+  "appenders": {
+    "console": {
+      "type": "console",
+      "layout": {
+        "type": "pattern",
+        "pattern": "%r %[[%c %p]%]: %m"
+      }
+    },
+    "datelog": {
+      "type": "dateFile",
+      "filename": "./logs/log",
+      "backups": 7,
+      "pattern": "yyyy-MM-dd.log",
+      "alwaysIncludePattern": true,
+      "compress": true
+    }
+  },
+  "categories": {
+    "default": { "appenders": ["console", "datelog"], "level": "all" }
+  }
+}

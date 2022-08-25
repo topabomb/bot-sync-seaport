@@ -1,0 +1,6 @@
+node_modules
+build
+logs
+.eslintrc*
+contracts
+state.json

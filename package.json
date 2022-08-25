@@ -1,0 +1,40 @@
+{
+  "name": "discordbottemplate_watchandsend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "set NODE_ENV=development&&nodemon",
+    "build": "rimraf ./build && tsc",
+    "start:index": "npm run build && node build/index.js",
+    "start:nftreport": "npm run build && node build/nftreport.js",
+    "lint": "eslint . --ext .ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^18.0.1",
+    "@types/node-fetch": "^2.6.2",
+    "@typescript-eslint/eslint-plugin": "^5.30.4",
+    "@typescript-eslint/parser": "^5.30.4",
+    "eslint": "^8.19.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "nodemon": "^2.0.18",
+    "prettier": "^2.7.1",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.8.2",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "bignumber.js": "^9.0.2",
+    "discord-interactions": "^3.2.0",
+    "dotenv": "^16.0.1",
+    "ethers": "^5.7.0",
+    "log4js": "^6.5.2",
+    "moment": "^2.29.4",
+    "moment-timezone": "^0.5.34",
+    "node-fetch": "^2.6.7",
+    "proxy-agent": "^5.0.0"
+  }
+}
