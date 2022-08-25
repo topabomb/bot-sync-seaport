@@ -4,4 +4,3 @@ logs
 *.pem
 .env
 contracts
-state.json
