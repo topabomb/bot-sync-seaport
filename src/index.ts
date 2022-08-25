@@ -192,9 +192,11 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
           if (asyncQueue.length >= 4) {
             let complete = 0;
             let errors = [] as EVENT_TYPE[];
+            let totals = [] as EVENT_TYPE[];
             while (asyncQueue.length > 0) {
               const item = asyncQueue.pop();
               if (!item) break;
+              totals = totals.concat(item.pendingOrders);
               try {
                 const receipt = await item.tx.wait(1);
                 logger.info(
@@ -219,7 +221,7 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
             }
             if (complete == asyncQueue.length) {
               //清理本地存储
-              for (const evt of orders) {
+              for (const evt of totals) {
                 if (errors.findIndex((v) => evt.transactionHash == v.transactionHash) < 0)
                   delete state.pendings[evt.transactionHash];
               }
