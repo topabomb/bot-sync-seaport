@@ -5,6 +5,7 @@ import log4js_main from './settings/log4js_main.json';
 configure(log4js_main);
 const logger = getLogger();
 import { ethers } from 'ethers';
+import cliProgress from 'cli-progress';
 
 import jsonChains from './settings/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
@@ -14,10 +15,11 @@ import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
 import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
 
-const BLOCK_BATCH_COUNT = 128;
+const BLOCK_BATCH_COUNT = 256;
 const TIME_INTERVAL = 1000 * 0.2;
 const STATE_FILE = './state.json';
-const SEND_BATCH_COUNT = 128;
+const SEND_BATCH_COUNT = 96;
+const ASYNC_NUMBER = 16;
 interface STATE_CHAIN_TYPE {
   last: number;
   pendings?: Record<string, EVENT_TYPE>;
@@ -90,7 +92,46 @@ const fetchEvents = async (network: string, block: number): Promise<{ toBlock: n
 
   return { toBlock, events };
 };
-
+const waitAsyncTrans = async (
+  queue: { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[]
+): Promise<{ totals: EVENT_TYPE[]; errors: EVENT_TYPE[] }> => {
+  logger.debug(`waitAsyncTrans:queue(${queue.length})`);
+  return new Promise((resolve, reason) => {
+    const provider = new ethers.providers.JsonRpcProvider(chainsCfg['wedid_dev'].rpcUrls[0]);
+    let complete = 0;
+    let errors = [] as EVENT_TYPE[];
+    let totals = [] as EVENT_TYPE[];
+    for (const item of queue) {
+      totals = totals.concat(item.pendingOrders);
+      //logger.debug(`waitAsyncTrans:waiting from (${item.tx.hash})`);
+      provider
+        .waitForTransaction(item.tx.hash, 1, 1000 * 20)
+        .then((receipt) => {
+          logger.info(
+            `complete transaction(${item.tx.hash}),block(${receipt.blockNumber}),confirmations (${
+              receipt.confirmations
+            }),gasUsed(${receipt.gasUsed}),effectiveGasPrice(${ethers.utils.formatUnits(
+              receipt.effectiveGasPrice,
+              'gwei'
+            )}gewi)`
+          );
+        })
+        .catch((err) => {
+          errors = errors.concat(item.pendingOrders);
+          const error = err as any;
+          if (error.receipt)
+            logger.error(
+              `sendToChain seaportOrderFulfilledBatch wait tx:${error.transactionHash},blockNumber:${error.receipt.blockNumber},reason:${error.reason}`
+            );
+          else logger.error(`sendToChain seaportOrderFulfilledBatch wait err:${(err as Error).message}`);
+        })
+        .finally(() => {
+          complete++;
+          if (complete == queue.length) resolve({ totals, errors });
+        });
+    }
+  });
+};
 const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVENT_TYPE[]) => {
   const provider = new ethers.providers.JsonRpcProvider(chainsCfg['wedid_dev'].rpcUrls[0]);
   const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC as string).connect(provider);
@@ -113,40 +154,27 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
   logger.warn(`sendToChain:QUEUE_TRANS has ${QUEUE_TRANS.length}`);
   const asyncQueue = [] as { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[];
   //处理队列
-  while (QUEUE_TRANS.length > SEND_BATCH_COUNT) {
+  while (QUEUE_TRANS.length >= SEND_BATCH_COUNT) {
     const orders = [];
     const sendOrders = [];
+    const bar = new cliProgress.SingleBar({
+      format: 'checking containsTransactions [{bar}] {percentage}% | {value}/{total} | ETA: {eta}s',
+    });
+    bar.start(QUEUE_TRANS.length, 0);
+    let progress = 0;
     do {
       const evt = QUEUE_TRANS.pop();
       if (evt) {
         orders.push(evt);
         const existent = await monitor.containsTransaction(chainsCfg[network].chainId, evt.transactionHash);
         if (!existent) sendOrders.push(evt);
-        /*
-      //通过estimateGas决定执行哪一些
-      let existent = false;
-      try {
-        await monitor.estimateGas.seaportOrderFulfilled(
-          evt.event,
-          chainsCfg[network].chainId,
-          evt.transactionHash,
-          evt.logIndex
-        );
-      } catch (err) {
-        const error = err as any;
-        existent = error.error ? (error.error as Error).message.endsWith('tran existent') : false;
-        if (!existent)
-          if (error.reason && error.error)
-            logger.error(
-              `sendToChain seaportOrderFulfilled estimateGas reason:${error.reason},message:${error.error.message},data:${error.error.data}`
-            );
-          else logger.error(`sendToChain seaportOrderFulfilled estimateGas err:${err as Error}`);
-      }
-      if (!existent) sendOrders.push(evt);
-      */
+        else delete state.pendings[evt.transactionHash];
+        bar.update(++progress);
       }
     } while (sendOrders.length < SEND_BATCH_COUNT && QUEUE_TRANS.length > 0);
-
+    bar.setTotal(progress);
+    bar.stop();
+    saveState(network, state);
     logger.warn(
       `sendToChain:orders(${orders.length}),sendOrders(${sendOrders.length}),QUEUE_TRANS(${QUEUE_TRANS.length})`
     );
@@ -188,46 +216,6 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
             }),gasLimit(${gasLimit.toString()},gasPrice(${ethers.utils.formatUnits(gasPrice, 'gwei')}gewi)`
           );
           asyncQueue.push({ tx, pendingOrders: [...sendOrders] });
-          //异步等待处理
-          if (asyncQueue.length >= 4) {
-            let complete = 0;
-            let errors = [] as EVENT_TYPE[];
-            let totals = [] as EVENT_TYPE[];
-            while (asyncQueue.length > 0) {
-              const item = asyncQueue.pop();
-              if (!item) break;
-              totals = totals.concat(item.pendingOrders);
-              try {
-                const receipt = await item.tx.wait(1);
-                logger.info(
-                  `complete transaction(${tx.hash}),block(${receipt.blockNumber}),confirmations (${
-                    receipt.confirmations
-                  }),gasUsed(${receipt.gasUsed}),effectiveGasPrice(${ethers.utils.formatUnits(
-                    receipt.effectiveGasPrice,
-                    'gwei'
-                  )}gewi)`
-                );
-              } catch (err) {
-                errors = errors.concat(item.pendingOrders);
-                const error = err as any;
-                if (error.receipt)
-                  logger.error(
-                    `sendToChain seaportOrderFulfilledBatch wait tx:${error.transactionHash},blockNumber:${error.receipt.blockNumber},reason:${error.reason}`
-                  );
-                else logger.error(`sendToChain seaportOrderFulfilledBatch wait err:${(err as Error).message}`);
-              } finally {
-                complete++;
-              }
-            }
-            if (complete == asyncQueue.length) {
-              //清理本地存储
-              for (const evt of totals) {
-                if (errors.findIndex((v) => evt.transactionHash == v.transactionHash) < 0)
-                  delete state.pendings[evt.transactionHash];
-              }
-              saveState(network, state);
-            }
-          }
         } catch (err) {
           const error = err as any;
           if (error.reason)
@@ -238,54 +226,18 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
         }
       }
     }
-  }
-  /*
-  //逐一处理
-  for (const evt of events) {
-    let gasLimit;
-    let existent = false;
-    try {
-      gasLimit = await monitor.estimateGas.seaportOrderFulfilled(
-        evt.event,
-        chainsCfg[network].chainId,
-        evt.transactionHash
-      );
-    } catch (err) {
-      const error = err as any;
-      existent = error.error ? (error.error as Error).message.endsWith('tran existent') : false;
-      if (!existent)
-        if (error.reason && error.error)
-          logger.error(`sendToChain estimateGas reason:${error.reason},data:${error.error.data}`);
-        else logger.error(`sendToChain estimateGas err:${err as Error}`);
-    }
-    if (gasLimit && !existent) {
-      gasLimit = Math.round(Number(gasLimit) / 8); //frontier中针对estimateGas似乎有个倍数处理，暂时除以经验值，参考地址https://github.com/paritytech/frontier/issues/76
-      const gasPrice = await provider.getGasPrice();
-      try {
-        const tx = await monitor.seaportOrderFulfilled(evt.event, chainsCfg[network].chainId, evt.transactionHash, {
-          gasLimit,
-          gasPrice,
-        });
-        logger.debug(
-          `pending transaction(${tx.hash}),nonce(${
-            tx.nonce
-          }),gasLimit(${gasLimit.toString()},gasPrice(${ethers.utils.formatUnits(gasPrice, 'gwei')}gewi)`
-        );
-        delete state.pendings[evt.transactionHash];
-        saveState(network, state);
-      } catch (err) {
-        const error = err as Error;
-        if (!error.message.includes('nonce has already been used')) {
-          logger.error(`sendToChain execute err:${err as Error}`);
-        } else logger.error(`sendToChain execute nonce has already been used`);
+    //异步等待处理
+    if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || QUEUE_TRANS.length < SEND_BATCH_COUNT)) {
+      const { totals, errors } = await waitAsyncTrans([...asyncQueue]);
+      asyncQueue.splice(0);
+      //清理本地存储
+      for (const evt of totals) {
+        if (errors.findIndex((v) => evt.transactionHash == v.transactionHash) < 0)
+          delete state.pendings[evt.transactionHash];
       }
-    } else if (existent) {
-      logger.warn(`sendToChain hash(${evt.transactionHash}) existent`);
-      delete state.pendings[evt.transactionHash];
       saveState(network, state);
     }
   }
-  */
 };
 const QUEUE_TRANS = [] as EVENT_TYPE[];
 const main = async (network: string) => {
