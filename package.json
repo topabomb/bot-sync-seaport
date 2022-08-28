@@ -7,7 +7,7 @@
     "dev": "set NODE_ENV=development&&nodemon",
     "build": "rimraf ./build && tsc",
     "start:index": "npm run build && node build/index.js",
-    "start:nftreport": "npm run build && node build/nftreport.js",
+    "nftreport": "npm run build && node build/nftreport.js",
     "lint": "eslint . --ext .ts"
   },
   "author": "",

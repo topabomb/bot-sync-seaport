@@ -60,7 +60,7 @@ const loadState = (network: string): Promise<Record<string, STATE_CHAIN_TYPE>> =
 };
 const fetchEvents = async (
   network: string,
-  lastest: number,
+  latest: number,
   block: number
 ): Promise<{ toBlock: number; events: EVENT_TYPE[] }> => {
   //block = 14950918; //用于测试block:14950918
@@ -68,8 +68,8 @@ const fetchEvents = async (
   const seaport = new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider);
   const topicFulfilled = seaport.interface.getEventTopic('OrderFulfilled');
   let toBlock = block + BLOCK_BATCH_COUNT;
-  if (toBlock > lastest) {
-    toBlock = lastest;
+  if (toBlock > latest) {
+    toBlock = latest;
   }
   const filter = {
     address: seaport.address, //不传递address可以查询所有合约的数据
@@ -264,8 +264,8 @@ const main = async (network: string) => {
     }
   }
   const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
-  let lastest = await provider.getBlockNumber();
-  logger.info(`main starting:network:${network},lastest(${lastest}),QUEUE_TRANS(${QUEUE_TRANS.length}).`);
+  let latest = await provider.getBlockNumber();
+  logger.info(`main starting:network:${network},latest(${latest}),QUEUE_TRANS(${QUEUE_TRANS.length}).`);
   const sleep = (ms: number) => {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
@@ -273,18 +273,18 @@ const main = async (network: string) => {
   };
   const procLoop = async () => {
     try {
-      const { toBlock, events } = await fetchEvents(network, lastest, state.last);
+      const { toBlock, events } = await fetchEvents(network, latest, state.last);
       if (events.length > 0 || QUEUE_TRANS.length > 0) {
         await sendToChain(network, state, events);
       }
       state.last = toBlock;
       saveState(network, state);
-      if (toBlock >= lastest) {
+      if (toBlock >= latest) {
         logger.warn(
-          `procLoop:Out of range,toBlock(${toBlock}),lastest(${lastest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
+          `procLoop:Out of range,toBlock(${toBlock}),latest(${latest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
         );
         await sleep(RELAX_INTERVAL - COMPACT_INTERVAL);
-        lastest = await provider.getBlockNumber();
+        latest = await provider.getBlockNumber();
       }
     } catch (err) {
       logger.error(`procLoop err:${(err as Error).message}`);

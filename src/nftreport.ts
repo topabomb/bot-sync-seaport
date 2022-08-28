@@ -8,11 +8,10 @@ import { ethers } from 'ethers';
 
 import jsonChains from './settings/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
-import jsonSeaport from './settings/seaport.json';
-const seaportCfg = jsonSeaport as Record<string, { Seaport: string; DeployAfterNumber: number }>;
-import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
-import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
+
+const WEDID_RPC_URL = process.env.WEDID_RPC_URL ? process.env.WEDID_RPC_URL : chainsCfg['wedid_dev'].rpcUrls[0];
+
 const report = async (monitor: ethers.Contract) => {
   console.log(
     '合约总数:',
@@ -22,14 +21,22 @@ const report = async (monitor: ethers.Contract) => {
   );
 };
 const main = async (network: string) => {
-  const provider = new ethers.providers.JsonRpcProvider(chainsCfg['wedid_dev'].rpcUrls[0]);
+  const provider = new ethers.providers.JsonRpcProvider(WEDID_RPC_URL);
   const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC as string).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   const logs = await monitor.queryFilter('SeaportOrderFulfilled', -10, 'latest');
   console.log(logs.length);
-  report(monitor);
+  let latest = await provider.getBlockNumber();
+  let timestamp = (await provider.getBlock('latest')).timestamp;
+  provider.on('block', async (number) => {
+    latest = number;
+    timestamp = (await provider.getBlock(number)).timestamp;
+    const logs = await monitor.queryFilter('SeaportOrderFulfilled', number, number);
+    console.log(`number:${number},timestamp:${timestamp},logs:${logs.length}`);
+    await report(monitor);
+  });
   monitor.on('SeaportOrderFulfilled', async (chainId, tranHash, logIndex) => {
-    console.log(`${network}交易：${chainId.toString()}#${tranHash}#${logIndex}#`);
+    //console.log(`wedid(${latest}:${timestamp}):${network}原交易：${chainId.toString()}#${tranHash}#${logIndex}`);
   });
 };
 void main('ethereum');

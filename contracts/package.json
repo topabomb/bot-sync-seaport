@@ -1,0 +1,35 @@
+{
+  "name": "quantitativenft",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx hardhat compile",
+    "test": "set TS_NODE_TRANSPILE_ONLY=1&&npx hardhat test",
+    "test:gasreport": "set TS_NODE_TRANSPILE_ONLY=1&&set REPORT_GAS=true&&npx hardhat test ",
+    "deploy:wedid_dev": "npx hardhat deploy --network wedid_dev",
+    "cleanData:wedid_dev": "npx hardhat cleanData --network wedid_dev",
+    "addExecutor:wedid_dev": "npx hardhat addExecutor --network wedid_dev --executor 0x3A5cF02ff066738009b7B4D47525CF766e5eCb47",
+    "accounts:wedid_dev": "npx hardhat accounts --network wedid_dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^1.0.2",
+    "@openzeppelin/contracts": "^4.7.0",
+    "@openzeppelin/contracts-upgradeable": "^4.7.0",
+    "@openzeppelin/hardhat-upgrades": "^1.19.0",
+    "@types/node-fetch": "^2.6.2",
+    "cli-progress": "^3.11.2",
+    "dotenv": "^16.0.1",
+    "hardhat": "^2.10.0",
+    "hardhat-deploy": "^0.11.11",
+    "hardhat-gas-reporter": "^1.0.8",
+    "hardhat-tracer": "^1.1.0-rc.6",
+    "moment-timezone": "^0.5.34",
+    "node-fetch": "^2.6.7",
+    "prettier-plugin-solidity": "^1.0.0-dev.22",
+    "proxy-agent": "^5.0.0"
+  }
+}
