@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "set NODE_ENV=development&&nodemon",
     "build": "rimraf ./build && tsc",
-    "start:index": "npm run build && node build/index.js",
-    "nftreport": "npm run build && node build/nftreport.js",
+    "watch:seaport": "npm run build && node build/watchSeaport.js",
+    "report": "npm run build && node build/monitorReport.js",
     "lint": "eslint . --ext .ts"
   },
   "author": "",

@@ -14,7 +14,6 @@ const seaportCfg = jsonSeaport as Record<string, { Seaport: string; DeployAfterN
 import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
 import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
-import { resolve } from 'path';
 
 const CHAIN_NAME = process.env.CHAIN_NAME ? process.env.CHAIN_NAME : 'ethereum';
 const RPC_URL = process.env.RPC_URL ? process.env.RPC_URL : chainsCfg[CHAIN_NAME].rpcUrls[0];
@@ -148,13 +147,11 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
   const provider = new ethers.providers.JsonRpcProvider(WEDID_RPC_URL);
   const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC as string).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
-  /*
-  logger.warn(
+  logger.info(
     `sendToChain:address(${wallet.address}),balance(${await ethers.utils.formatEther(
       await wallet.getBalance()
     )},tranCount(${await wallet.getTransactionCount()})`
   );
-  */
   //先保存本次尚未处理的交易
   if (!state.pendings) state.pendings = {};
   for (const evt of events) {
