@@ -1,12 +1,12 @@
 import 'dotenv/config';
 import { configure, getLogger } from 'log4js';
-import log4js_main from './settings/log4js_main.json';
-//configure(`${__dirname}/settings/log4js_main.json`);
+import log4js_main from './constants/log4js_main.json';
+//configure(`${__dirname}/constants/log4js_main.json`);
 configure(log4js_main);
 const logger = getLogger();
 import { ethers } from 'ethers';
 
-import jsonChains from './settings/chains.json';
+import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
 import abiMonitor from './abis/NftTradeMonitor.json';
 

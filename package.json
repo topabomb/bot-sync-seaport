@@ -5,15 +5,15 @@
   "main": "index.js",
   "scripts": {
     "dev": "set NODE_ENV=development&&nodemon",
+    "watch:seaport": "ts-node src/watchSeaport.ts",
+    "report": "ts-node src/monitorReport.ts",
     "build": "rimraf ./build && tsc",
-    "start": "node build/index.js",
+    "start": "npm run build && node build/index.js",
     "start:watch:seaport": "npm run start watch_seaport --rpc https://eth-mainnet.nodereal.io/v1/32bdddf6055844b48f427d6fa3651dce",
     "start:report": "npm run start report --wedid-rpc http://wedid-test-rpc.weero.net/",
-    "watch:seaport": "npm run build && node build/watchSeaport.js",
-    "report": "npm run build && node build/monitorReport.js",
     "lint": "eslint . --ext .ts"
   },
-  "author": "",
+  "author": "Topabomb",
   "license": "ISC",
   "devDependencies": {
     "@types/cli-progress": "^3.11.0",

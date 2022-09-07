@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import { configure, getLogger } from 'log4js';
-import log4js_main from './settings/log4js_main.json';
-//configure(`${__dirname}/settings/log4js_main.json`);
+import log4js_main from './constants/log4js_main.json';
+//configure(`${__dirname}/constants/log4js_main.json`);
 configure(log4js_main);
 const logger = getLogger();
 import { ethers } from 'ethers';
 import cliProgress from 'cli-progress';
 
-import jsonChains from './settings/chains.json';
+import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
-import jsonSeaport from './settings/seaport.json';
+import jsonSeaport from './constants/seaport.json';
 const seaportCfg = jsonSeaport as Record<string, { Seaport: string; DeployAfterNumber: number }>;
 import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
