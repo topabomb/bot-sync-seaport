@@ -10,8 +10,14 @@ import jsonChains from './settings/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
 import abiMonitor from './abis/NftTradeMonitor.json';
 
-const WEDID_RPC_URL = process.env.WEDID_RPC_URL ? process.env.WEDID_RPC_URL : chainsCfg['wedid_dev'].rpcUrls[0];
-
+import { program } from 'commander'; //https://github.com/tj/commander.js/blob/master/Readme_zh-CN.md
+program
+  .option('-m,--mnemonic <助记词>', '替代.env中的助记词')
+  .option('-r,--wedid-rpc <RPC地址>', '替代内置RPC', chainsCfg['wedid_dev'].rpcUrls[0])
+  .option('-p,--proxy <服务器地址>', '使用代理服务器');
+const CommandLineArgs = program.parse().opts();
+const WEDID_RPC_URL = CommandLineArgs.wedidRpc;
+const MNEMONIC: string = CommandLineArgs.mnemonic ? CommandLineArgs.mnemonic : process.env.MNEMONIC;
 const report = async (monitor: ethers.Contract) => {
   console.log(
     '合约总数:',
@@ -22,10 +28,11 @@ const report = async (monitor: ethers.Contract) => {
 };
 const main = async (network: string) => {
   const provider = new ethers.providers.JsonRpcProvider(WEDID_RPC_URL);
-  const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC as string).connect(provider);
+  const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
-  const logs = await monitor.queryFilter('SeaportOrderFulfilled', -10, 'latest');
-  console.log(logs.length);
+  const logs = await monitor.queryFilter('SeaportOrderFulfilled', -100, 'latest');
+  console.log(logs.length, monitor.interface.getSighash(monitor.interface.getEvent('OrderFulfilled'))); //0x9d9af8e3
+  if (logs.length > 0) console.log(JSON.stringify({ ...monitor.interface.parseLog(logs[0]).args }));
   let latest = await provider.getBlockNumber();
   let timestamp = (await provider.getBlock('latest')).timestamp;
   provider.on('block', async (number) => {

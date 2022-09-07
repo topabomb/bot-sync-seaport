@@ -18,59 +18,65 @@ describe('NftTradeMonitor主流程', () => {
     it('通过地址列表验证', async () => {
       const { monitor } = await loadFixture(deployFixture);
       expect(await monitor.getItemCount()).to.equal(0);
-      const addresses = [
+      const tokens = [
         '0x495f947276749ce646f68ac8c248420045cb7b51',
         '0x495f947276749ce646f68ac8c248420045cb7b52',
         '0x495f947276749ce646f68ac8c248420045cb7b53',
         '0x495f947276749ce646f68ac8c248420045cb7b54',
         '0x495f947276749ce646f68ac8c248420045cb7b55',
       ];
+      const swapToken = '0x15D4c048F83bd7e37d49eA4C83a07267Ec4203dA';
+      const recipients = [
+        '0x9d6cb1214A76E00252949C1972f02Fc43bd7F167',
+        '0x0000a26b00c1F0DF003000390027140000fAa719',
+        '0x5493518B4518D465aa61965a4f9510f39E6afa46',
+      ];
       const tokenid = 0x2;
       const logIndex = 0x1;
       const offer = {
-        token: AddressZero,
+        token: '0xc36cF0cFcb5d905B8B513860dB0CFE63F6Cf9F5c',
         identifier: tokenid,
         itemType: 2,
         amount: 0x1,
       };
       const consideration = {
-        token: AddressZero,
-        identifier: tokenid,
-        itemType: 2,
+        token: swapToken,
+        identifier: 0x0,
+        itemType: 0,
         amount: 0x1,
-        recipient: AddressZero,
+        recipient: '0x9d6cb1214A76E00252949C1972f02Fc43bd7F167',
       };
       const order = {
-        orderHash: HashZero,
-        offerer: AddressZero,
-        zone: AddressZero,
-        recipient: AddressZero,
-        offer: addresses.slice(0, 3).map((v) => ({ ...offer, token: v })),
-        consideration: addresses.slice(1, 5).map((v) => ({ ...consideration, token: v })),
+        orderHash: '0xb4e53f0ff266bf348e22df12a611eaaff017df75fba86f32245219af7aac98b5',
+        offerer: '0x9d6cb1214A76E00252949C1972f02Fc43bd7F167',
+        zone: '0x004C00500000aD104D7DBd00e3ae0A5C00560C00',
+        recipient: '0x8b0e03f41cD3cFF70d72346C9e92A49b81720855',
+        offer: tokens.map((v) => ({ ...offer, token: v })),
+        consideration: recipients.map((v) => ({ ...consideration, recipient: v })),
       };
       const chainId = 0x1;
       const tx = await monitor.seaportOrderFulfilled(order, chainId, HashZero, logIndex);
       await tx.wait();
-      expect(await monitor.getItemCount()).to.equal(addresses.length);
-      for (let i = 0; i < addresses.length; i++) {
-        const nfthash = ethers.utils.solidityKeccak256(['uint256', 'address'], [chainId, addresses[i]]);
-        const itemhash = ethers.utils.solidityKeccak256(['uint256', 'address', 'uint256'], [chainId, addresses[i], tokenid]);
+      expect(await monitor.getItemCount()).to.equal(tokens.length);
+      for (let i = 0; i < tokens.length; i++) {
+        const nfthash = ethers.utils.solidityKeccak256(['uint256', 'address'], [chainId, tokens[i]]);
+        const itemhash = ethers.utils.solidityKeccak256(['uint256', 'address', 'uint256'], [chainId, tokens[i], tokenid]);
         expect(await monitor.getNftContractHashByIndex(i)).to.equal(nfthash);
         expect(await monitor.getNftItemHashByIndex(i)).to.equal(itemhash);
 
         let nftInfo = await monitor.getNftContractByIndex(i);
         expect(nftInfo.chainId).to.equal(chainId);
-        expect(nftInfo.contractAddr).to.equal(addresses[i]);
+        expect(nftInfo.contractAddr).to.equal(tokens[i]);
 
-        nftInfo = await monitor.getNftContract(chainId, addresses[i]);
+        nftInfo = await monitor.getNftContract(chainId, tokens[i]);
         expect(nftInfo.chainId).to.equal(chainId);
-        expect(nftInfo.contractAddr).to.equal(addresses[i]);
+        expect(nftInfo.contractAddr).to.equal(tokens[i]);
 
         const tokenInfo = await monitor.getNftItemByIndex(i);
         expect(tokenInfo.tokenId).to.equal(tokenid);
         expect(tokenInfo.contractHash).to.equal(nfthash);
 
-        nftInfo = await monitor.getNftItem(chainId, addresses[i], tokenid);
+        nftInfo = await monitor.getNftItem(chainId, tokens[i], tokenid);
         expect(tokenInfo.tokenId).to.equal(tokenid);
         expect(tokenInfo.contractHash).to.equal(nfthash);
       }
@@ -78,7 +84,7 @@ describe('NftTradeMonitor主流程', () => {
       await monitor.clean();
       expect(await monitor.getContractCount()).to.equal(0);
       expect(await monitor.getItemCount()).to.equal(0);
-      for (let i = 0; i < addresses.length; i++) {
+      for (let i = 0; i < tokens.length; i++) {
         await expect(monitor.getNftContractByIndex(i)).to.be.rejectedWith('contract idx non-existent');
         await expect(monitor.getNftContractHashByIndex(i)).to.be.rejectedWith('contract idx non-existent');
         await expect(monitor.getNftItemByIndex(i)).to.be.rejectedWith('item idx non-existent');

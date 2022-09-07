@@ -13,17 +13,37 @@ import jsonSeaport from './settings/seaport.json';
 const seaportCfg = jsonSeaport as Record<string, { Seaport: string; DeployAfterNumber: number }>;
 import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
-import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
 
-const CHAIN_NAME = process.env.CHAIN_NAME ? process.env.CHAIN_NAME : 'ethereum';
-const RPC_URL = process.env.RPC_URL ? process.env.RPC_URL : chainsCfg[CHAIN_NAME].rpcUrls[0];
-const WEDID_RPC_URL = process.env.WEDID_RPC_URL ? process.env.WEDID_RPC_URL : chainsCfg['wedid_dev'].rpcUrls[0];
-const BLOCK_BATCH_COUNT = process.env.BLOCK_BATCH_COUNT ? Number(process.env.BLOCK_BATCH_COUNT) : 256;
-const COMPACT_INTERVAL = process.env.COMPACT_INTERVAL ? Number(process.env.COMPACT_INTERVAL) : 1000 * 0.2;
-const RELAX_INTERVAL = process.env.RELAX_INTERVAL ? Number(process.env.RELAX_INTERVAL) : 1000 * 30;
-const STATE_FILE = process.env.STATE_FILE ? process.env.STATE_FILE : './state.json';
-const SEND_BATCH_COUNT = process.env.SEND_BATCH_COUNT ? Number(process.env.SEND_BATCH_COUNT) : 96;
-const ASYNC_NUMBER = process.env.ASYNC_NUMBER ? Number(process.env.ASYNC_NUMBER) : 8;
+import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
+import * as json5 from 'json5';
+import { program } from 'commander'; //https://github.com/tj/commander.js/blob/master/Readme_zh-CN.md
+program
+  .requiredOption('-c,--config <文件路径>', 'JSON配置文件', './configures/watchSeaport.json')
+  .option('-m,--mnemonic <助记词>', '替代.env中的助记词')
+  .option('-r,--rpc <RPC地址>', '替代内置RPC')
+  .option('-p,--proxy <服务器地址>', '使用代理服务器');
+const CommandLineArgs = program.parse().opts();
+const CONFIG = json5.parse(readFileSync(CommandLineArgs.config, 'utf-8'));
+//config配置文件中的可配置项目
+const CHAIN_NAME = CONFIG.args.CHAIN_NAME ? CONFIG.args.CHAIN_NAME : 'ethereum';
+const WEDID_RPC_URL = CONFIG.args.WEDID_RPC_URL ? CONFIG.args.WEDID_RPC_URL : chainsCfg['wedid_dev'].rpcUrls[0];
+const BLOCK_BATCH_COUNT = CONFIG.args.BLOCK_BATCH_COUNT ? Number(CONFIG.args.BLOCK_BATCH_COUNT) : 256;
+const COMPACT_INTERVAL = CONFIG.args.COMPACT_INTERVAL ? Number(CONFIG.args.COMPACT_INTERVAL) : 1000 * 0.2;
+const RELAX_INTERVAL = CONFIG.args.RELAX_INTERVAL ? Number(CONFIG.args.RELAX_INTERVAL) : 1000 * 30;
+const STATE_FILE = CONFIG.args.STATE_FILE ? CONFIG.args.STATE_FILE : './state.json';
+const SEND_BATCH_COUNT = CONFIG.args.SEND_BATCH_COUNT ? Number(CONFIG.args.SEND_BATCH_COUNT) : 96;
+const ASYNC_NUMBER = CONFIG.args.ASYNC_NUMBER ? Number(CONFIG.args.ASYNC_NUMBER) : 8;
+const WAIT_CONFIRMATION_INTERVAL = CONFIG.args.WAIT_CONFIRMATION_INTERVAL
+  ? Number(CONFIG.args.WAIT_CONFIRMATION_INTERVAL)
+  : 20 * 1000;
+//如下是可用命令行参数替换的配置
+const MNEMONIC: string = CommandLineArgs.mnemonic ? CommandLineArgs.mnemonic : process.env.MNEMONIC;
+const RPC_URL = CommandLineArgs.rpc ? CommandLineArgs.rpc : chainsCfg[CHAIN_NAME].rpcUrls[0];
+const Get_ProviderWithProxy = (rpc: string) => {
+  const proxy = CommandLineArgs.proxy ? CommandLineArgs.proxy : undefined;
+  proxy && console.log(`❌ethers v5暂未支持代理，proxy选项暂时无效，当前proxy(${proxy})`);
+  return new ethers.providers.JsonRpcProvider(rpc);
+};
 interface STATE_CHAIN_TYPE {
   last: number;
   pendings?: Record<string, EVENT_TYPE>;
@@ -63,7 +83,7 @@ const fetchEvents = async (
   block: number
 ): Promise<{ toBlock: number; events: EVENT_TYPE[] }> => {
   //block = 14950918; //用于测试block:14950918
-  const provider = new ethers.providers.JsonRpcProvider(chainsCfg[network].rpcUrls[0]);
+  const provider = Get_ProviderWithProxy(chainsCfg[network].rpcUrls[0]);
   const seaport = new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider);
   const topicFulfilled = seaport.interface.getEventTopic('OrderFulfilled');
   let toBlock = block + BLOCK_BATCH_COUNT;
@@ -108,7 +128,7 @@ const waitAsyncTrans = async (
 ): Promise<{ totals: EVENT_TYPE[]; errors: EVENT_TYPE[] }> => {
   logger.debug(`waitAsyncTrans:queue(${queue.length})`);
   return new Promise((resolve, reason) => {
-    const provider = new ethers.providers.JsonRpcProvider(WEDID_RPC_URL);
+    const provider = Get_ProviderWithProxy(WEDID_RPC_URL);
     let complete = 0;
     let errors = [] as EVENT_TYPE[];
     let totals = [] as EVENT_TYPE[];
@@ -116,7 +136,7 @@ const waitAsyncTrans = async (
       totals = totals.concat(item.pendingOrders);
       //logger.debug(`waitAsyncTrans:waiting from (${item.tx.hash})`);
       provider
-        .waitForTransaction(item.tx.hash, 1, 1000 * 20)
+        .waitForTransaction(item.tx.hash, 1, WAIT_CONFIRMATION_INTERVAL)
         .then((receipt) => {
           logger.info(
             `complete transaction(${item.tx.hash}),block(${receipt.blockNumber}),confirmations (${
@@ -144,8 +164,8 @@ const waitAsyncTrans = async (
   });
 };
 const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVENT_TYPE[]) => {
-  const provider = new ethers.providers.JsonRpcProvider(WEDID_RPC_URL);
-  const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC as string).connect(provider);
+  const provider = Get_ProviderWithProxy(WEDID_RPC_URL);
+  const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   logger.info(
     `sendToChain:address(${wallet.address}),balance(${await ethers.utils.formatEther(
@@ -260,7 +280,7 @@ const main = async (network: string) => {
       QUEUE_TRANS.push({ ...evt });
     }
   }
-  const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+  const provider = Get_ProviderWithProxy(RPC_URL);
   let latest = await provider.getBlockNumber();
   logger.info(`main starting:network:${network},latest(${latest}),QUEUE_TRANS(${QUEUE_TRANS.length}).`);
   const sleep = (ms: number) => {
@@ -291,5 +311,4 @@ const main = async (network: string) => {
   };
   timeoutHandler = setTimeout(procLoop, 0);
 };
-
-void main(CHAIN_NAME);
+main(CHAIN_NAME);

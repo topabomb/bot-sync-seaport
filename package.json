@@ -1,11 +1,14 @@
 {
-  "name": "discordbottemplate_watchandsend",
+  "name": "bot-sync-exchange",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
     "dev": "set NODE_ENV=development&&nodemon",
     "build": "rimraf ./build && tsc",
+    "start": "node build/index.js",
+    "start:watch:seaport": "npm run start watch_seaport --rpc https://eth-mainnet.nodereal.io/v1/32bdddf6055844b48f427d6fa3651dce",
+    "start:report": "npm run start report --wedid-rpc http://wedid-test-rpc.weero.net/",
     "watch:seaport": "npm run build && node build/watchSeaport.js",
     "report": "npm run build && node build/monitorReport.js",
     "lint": "eslint . --ext .ts"
@@ -30,12 +33,13 @@
   "dependencies": {
     "bignumber.js": "^9.0.2",
     "cli-progress": "^3.11.2",
+    "commander": "^9.4.0",
     "dotenv": "^16.0.1",
     "ethers": "^5.7.0",
+    "json5": "^2.2.1",
     "log4js": "^6.5.2",
     "moment": "^2.29.4",
     "moment-timezone": "^0.5.34",
-    "node-fetch": "^2.6.7",
-    "proxy-agent": "^5.0.0"
+    "node-fetch": "^2.6.7"
   }
 }

@@ -1,0 +1,40 @@
+{
+  "_chainId": { "type": "BigNumber", "hex": "0x01" },
+  "_tranHash": "0x95d74b096f69fd295afe2a0cd96298f0d50b19bcd87c9d2d80e2946986275e9d",
+  "_logIndex": { "type": "BigNumber", "hex": "0x013f" },
+  "orderHash": "0xe6edebde73ee54ce587f254ad426db87074aaa548f28aa28cc9de81fa653c3d7",
+  "offerer": "0x55D7Ea1d1877A7e9d80A8e50256Ca98Fc57fB2AA",
+  "zone": "0x004C00500000aD104D7DBd00e3ae0A5C00560C00",
+  "recipient": "0xb02F3b87a26cc07Fa4A6534b2d68498e24D50c29",
+  "offer": [
+    [
+      2,
+      "0xcCA8050215E585E2a223C6eA9D1D1F9b30BEAf3e",
+      { "type": "BigNumber", "hex": "0x1117" },
+      { "type": "BigNumber", "hex": "0x01" }
+    ]
+  ],
+  "consideration": [
+    [
+      0,
+      "0x0000000000000000000000000000000000000000",
+      { "type": "BigNumber", "hex": "0x00" },
+      { "type": "BigNumber", "hex": "0xefe5a136755000" },
+      "0x55D7Ea1d1877A7e9d80A8e50256Ca98Fc57fB2AA"
+    ],
+    [
+      0,
+      "0x0000000000000000000000000000000000000000",
+      { "type": "BigNumber", "hex": "0x00" },
+      { "type": "BigNumber", "hex": "0x067bd3ecb71000" },
+      "0x0000a26b00c1F0DF003000390027140000fAa719"
+    ],
+    [
+      0,
+      "0x0000000000000000000000000000000000000000",
+      { "type": "BigNumber", "hex": "0x00" },
+      { "type": "BigNumber", "hex": "0x0cf7a7d96e2000" },
+      "0x564d27AEa51b24d8aA807CB94678DF69db7705EB"
+    ]
+  ]
+}

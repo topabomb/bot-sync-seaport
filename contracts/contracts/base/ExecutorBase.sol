@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-abstract contract Executor is OwnableUpgradeable {
+abstract contract ExecutorBase is OwnableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
     modifier onlyExecutorOrOwner() {
         require(

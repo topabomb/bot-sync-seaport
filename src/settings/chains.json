@@ -110,7 +110,7 @@
   "wedid_dev": {
     "chainId": "0x796",
     "chainName": "WeDID Chain Testnet",
-    "rpcUrls": ["http://localhost:9933"],
+    "rpcUrls": ["http://wedid-test-rpc.weero.net/"],
     "blockExplorerUrls": ["http://localhost:9933"],
     "iconUrls": [],
     "nativeCurrency": {
