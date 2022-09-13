@@ -53,7 +53,7 @@ const waitAsyncTrans = async (
 ): Promise<{ totals: EVENT_TYPE[]; errors: EVENT_TYPE[] }> => {
   logger.debug(`waitAsyncTrans:queue(${queue.length})`);
   return new Promise((resolve, reason) => {
-    const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
+    const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy, true);
     let complete = 0;
     let errors = [] as EVENT_TYPE[];
     let totals = [] as EVENT_TYPE[];
@@ -93,7 +93,7 @@ const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, ev
   const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   logger.info(
-    `sendToChain:address(${wallet.address}),balance(${await ethers.utils.formatEther(
+    `sendToChain:address(${wallet.address}),balance(${ethers.utils.formatEther(
       await wallet.getBalance()
     )},tranCount(${await wallet.getTransactionCount()})`
   );
@@ -177,11 +177,11 @@ const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, ev
       //清理本地存储
       for (const evt of totals) {
         if (errors.findIndex((v) => evt.transactionHash == v.transactionHash) < 0)
-          state.del(getStateKey(evt.transactionHash, evt.logIndex));
+          await state.del(getStateKey(evt.transactionHash, evt.logIndex));
       }
+      state.revertPop(); //未被del的数据应该回滚，下次循环继续处理
     }
   }
-  state.revertPop();
   logger.info(`end sendToChain: pendings has ${state.pendingsLength}`);
 };
 const main = async (network: string) => {
@@ -244,4 +244,4 @@ const main = async (network: string) => {
   };
   timeoutHandler = setTimeout(procLoop, 0);
 };
-main(CHAIN_NAME);
+void main(CHAIN_NAME);

@@ -20,10 +20,10 @@ class State<T extends STATE_PARTIAL_BASE> {
     };
 
     this.leveldb.state.open((err) => {
-      err && console.error('state open fail', err);
+      if (err) console.error('state open fail', err);
     });
     this.leveldb.pendings.open((err) => {
-      err && console.error('pendings open fail', err);
+      if (err) console.error('pendings open fail', err);
     });
 
     this.defaultValue = defaultValue ? defaultValue : ({ last: 0 } as T);
@@ -51,7 +51,7 @@ class State<T extends STATE_PARTIAL_BASE> {
     if (this.__poppedKeys.has(key)) this.__poppedKeys.delete(key);
     try {
       const old = await this.leveldb.pendings.get(key);
-      console.error(`${key}已存在`);
+      console.error(`${key} existed.`);
     } catch {
       await this.leveldb?.pendings.put(key, value);
       this.__pendingsLength += 1;
@@ -78,7 +78,7 @@ class State<T extends STATE_PARTIAL_BASE> {
     }
     return val;
   }
-  async revertPop() {
+  revertPop() {
     //需要移除的应该调用del方法移除，本方法将未del的pop数据进行回滚
     for (const key of [...this.__poppedKeys.keys()]) {
       this.__poppedKeys.delete(key);
