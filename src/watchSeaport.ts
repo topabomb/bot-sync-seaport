@@ -6,7 +6,7 @@ import 'dotenv/config';
 import { configure, getLogger } from 'log4js';
 configure(`${__dirname}/constants/log4js_main.json`);
 const logger = getLogger();
-import { Get_ProviderWithProxy, fetchEventsByContract } from './utils';
+import { getProviderWithProxy, fetchEventsByContract, waitAsyncTrans, Sleep } from './utils';
 import { State, STATE_PARTIAL_BASE } from './state';
 
 import jsonChains from './constants/chains.json';
@@ -22,7 +22,6 @@ program
   .option('-r,--rpc <RPC地址>', '替代内置RPC')
   .option('-p,--proxy <服务器地址>', '使用代理服务器');
 const CommandLineArgs = program.parse().opts();
-console.log(CommandLineArgs);
 const CONFIG = json5.parse(readFileSync(CommandLineArgs.config, 'utf-8'));
 //config配置文件中的可配置项目
 const CHAIN_NAME = CONFIG.args.CHAIN_NAME ? CONFIG.args.CHAIN_NAME : 'ethereum';
@@ -48,48 +47,9 @@ interface EVENT_TYPE {
 const getStateKey = (transactionHash: string, logIndex: number) => {
   return `${transactionHash}#${logIndex}`;
 };
-const waitAsyncTrans = async (
-  queue: { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[]
-): Promise<{ totals: EVENT_TYPE[]; errors: EVENT_TYPE[] }> => {
-  logger.debug(`waitAsyncTrans:queue(${queue.length})`);
-  return new Promise((resolve, reason) => {
-    const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy, true);
-    let complete = 0;
-    let errors = [] as EVENT_TYPE[];
-    let totals = [] as EVENT_TYPE[];
-    for (const item of queue) {
-      totals = totals.concat(item.pendingOrders);
-      //logger.debug(`waitAsyncTrans:waiting from (${item.tx.hash})`);
-      provider
-        .waitForTransaction(item.tx.hash, 1, WAIT_CONFIRMATION_INTERVAL)
-        .then((receipt) => {
-          logger.info(
-            `complete transaction(${item.tx.hash}),block(${receipt.blockNumber}),confirmations (${
-              receipt.confirmations
-            }),gasUsed(${receipt.gasUsed}),effectiveGasPrice(${ethers.utils.formatUnits(
-              receipt.effectiveGasPrice,
-              'gwei'
-            )}gewi)`
-          );
-        })
-        .catch((err) => {
-          errors = errors.concat(item.pendingOrders);
-          const error = err as any;
-          if (error.receipt)
-            logger.error(
-              `sendToChain seaportOrderFulfilledBatch wait tx:${error.transactionHash},blockNumber:${error.receipt.blockNumber},reason:${error.reason}`
-            );
-          else logger.error(`sendToChain seaportOrderFulfilledBatch wait err:${(err as Error).message}`);
-        })
-        .finally(() => {
-          complete++;
-          if (complete == queue.length) resolve({ totals, errors });
-        });
-    }
-  });
-};
+
 const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, events: EVENT_TYPE[]) => {
-  const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
+  const provider = getProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
   const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   logger.info(
@@ -172,7 +132,12 @@ const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, ev
     }
     //异步等待处理
     if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || state.pendingsLength < SEND_BATCH_COUNT)) {
-      const { totals, errors } = await waitAsyncTrans([...asyncQueue]);
+      const { totals, errors } = await waitAsyncTrans<EVENT_TYPE>(
+        [...asyncQueue],
+        logger,
+        getProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy, true),
+        WAIT_CONFIRMATION_INTERVAL
+      );
       asyncQueue.splice(0);
       //清理本地存储
       for (const evt of totals) {
@@ -188,21 +153,16 @@ const main = async (network: string) => {
   let timeoutHandler;
   const state = new State(network, STATE_FILE, { last: seaportCfg[network].DeployAfterNumber });
   await state.refresh();
-  const provider = Get_ProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
+  const provider = getProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
   let latest = await provider.getBlockNumber();
+  console.warn(CommandLineArgs);
   logger.info(
     `main starting:network(${network}),latest(${latest}),last(${state.last}),pendings(${state.pendingsLength}).`
   );
-  const sleep = (ms: number) => {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  };
   const procLoop = async () => {
     try {
-      const seaport = new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider);
       const { toBlock, logs } = await fetchEventsByContract(
-        seaport,
+        new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider),
         'OrderFulfilled',
         logger,
         BLOCK_BATCH_COUNT,
@@ -233,15 +193,15 @@ const main = async (network: string) => {
         logger.warn(
           `procLoop:Out of range,toBlock(${toBlock}),latest(${latest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
         );
-        await sleep(RELAX_INTERVAL - COMPACT_INTERVAL);
+        await Sleep(RELAX_INTERVAL - COMPACT_INTERVAL);
         latest = await provider.getBlockNumber();
       }
     } catch (err) {
       logger.error(`procLoop err:${(err as Error).message},${(err as Error).stack}`);
     } finally {
-      timeoutHandler = setTimeout(procLoop, COMPACT_INTERVAL);
+      timeoutHandler = setTimeout(() => void procLoop(), COMPACT_INTERVAL);
     }
   };
-  timeoutHandler = setTimeout(procLoop, 0);
+  timeoutHandler = setTimeout(() => void procLoop(), 0);
 };
 void main(CHAIN_NAME);

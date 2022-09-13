@@ -10,7 +10,7 @@ import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
 import abiMonitor from './abis/NftTradeMonitor.json';
 
-import { Get_ProviderWithProxy } from './utils';
+import { getProviderWithProxy } from './utils';
 
 import { program } from 'commander'; //https://github.com/tj/commander.js/blob/master/Readme_zh-CN.md
 program
@@ -23,6 +23,7 @@ const WEDID_RPC_URL = CommandLineArgs.wedidRpc;
 const MNEMONIC: string = CommandLineArgs.mnemonic ? CommandLineArgs.mnemonic : process.env.MNEMONIC;
 const report = async (monitor: ethers.Contract) => {
   console.log(
+    await monitor.provider.getBlockNumber(),
     '合约总数:',
     (await monitor.getContractCount()).toString(),
     '藏品总数:',
@@ -30,7 +31,7 @@ const report = async (monitor: ethers.Contract) => {
   );
 };
 const main = async (network: string) => {
-  const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
+  const provider = getProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
   const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   const logs = await monitor.queryFilter('SeaportOrderFulfilled', -1, 'latest');
@@ -38,14 +39,16 @@ const main = async (network: string) => {
   if (logs.length > 0) console.log(JSON.stringify({ ...monitor.interface.parseLog(logs[0]).args }));
   let latest = await provider.getBlockNumber();
   let timestamp = (await provider.getBlock('latest')).timestamp;
-  provider.on('block', async (number) => {
-    latest = number;
-    timestamp = (await provider.getBlock(number)).timestamp;
-    const logs = await monitor.queryFilter('SeaportOrderFulfilled', number, number);
-    console.log(`number:${number},timestamp:${timestamp},logs:${logs.length}`);
-    await report(monitor);
+  provider.on('block', (number) => {
+    void (async () => {
+      latest = number;
+      timestamp = (await provider.getBlock(number)).timestamp;
+      const logs = await monitor.queryFilter('SeaportOrderFulfilled', number, number);
+      console.log(`number:${number},timestamp:${timestamp},logs:${logs.length}`);
+      await report(monitor);
+    })();
   });
-  monitor.on('SeaportOrderFulfilled', async (chainId, tranHash, logIndex) => {
+  monitor.on('SeaportOrderFulfilled', (chainId, tranHash, logIndex) => {
     //console.log(`wedid(${latest}:${timestamp}):${network}原交易：${chainId.toString()}#${tranHash}#${logIndex}`);
   });
 };
