@@ -19,13 +19,21 @@ contract SeaportFeedExecutor is ExecutorBase {
         oracle = ICollectionOracle(oraceAddress);
     }
 
-    function containsTransaction(uint chainId, bytes32 tranHash) public view returns (bool existent) {
-        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash));
+    function containsEvent(
+        uint chainId,
+        bytes32 tranHash,
+        uint logIndex
+    ) public view returns (bool existent) {
+        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash, logIndex));
         existent = EnumerableSet.contains(tranHash_indexes, localTranHash);
     }
 
-    function _addTranHash(uint chainId, bytes32 tranHash) internal returns (bool) {
-        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash));
+    function _addTranHash(
+        uint chainId,
+        bytes32 tranHash,
+        uint logIndex
+    ) internal returns (bool) {
+        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash, logIndex));
         return EnumerableSet.add(tranHash_indexes, localTranHash);
     }
 
@@ -35,8 +43,8 @@ contract SeaportFeedExecutor is ExecutorBase {
         bytes32 tranHash,
         uint logIndex
     ) public onlyExecutorOrOwner {
-        require(_addTranHash(chainId, tranHash), "tran existent");
-        if (!monitor.containsTransaction(chainId, tranHash)) monitor.seaportOrderFulfilled(order, chainId, tranHash, logIndex);
+        require(_addTranHash(chainId, tranHash, logIndex), "tran existent");
+        if (!monitor.containsEvent(chainId, tranHash, logIndex)) monitor.seaportOrderFulfilled(order, chainId, tranHash, logIndex);
         bool isSell = (order.offer[0].itemType != ItemType.NATIVE && order.offer[0].itemType != ItemType.ERC20) ? true : false;
         require(isSell ? order.offer.length == 1 : order.consideration.length == 1, "err args"); //仅支持一个标的的订单处理
         address sellToken = isSell ? order.offer[0].token : order.consideration[0].token;

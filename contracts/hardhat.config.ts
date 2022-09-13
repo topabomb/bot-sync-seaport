@@ -36,7 +36,7 @@ const config: HardhatUserConfig = {
       accounts: accounts(),
     },
     wedid_dev: {
-      url: 'https://devchain.nawarat.io',
+      url: 'http://wedid-test-rpc.weero.net/',
       chainId: 1942,
       accounts: accounts(),
     },

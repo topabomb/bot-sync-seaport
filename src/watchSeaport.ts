@@ -1,11 +1,13 @@
-import 'dotenv/config';
-import { configure, getLogger } from 'log4js';
-import log4js_main from './constants/log4js_main.json';
-//configure(`${__dirname}/constants/log4js_main.json`);
-configure(log4js_main);
-const logger = getLogger();
+import { readFileSync } from 'fs';
+import * as json5 from 'json5';
 import { ethers } from 'ethers';
 import cliProgress from 'cli-progress';
+import 'dotenv/config';
+import { configure, getLogger } from 'log4js';
+configure(`${__dirname}/constants/log4js_main.json`);
+const logger = getLogger();
+import { Get_ProviderWithProxy, fetchEventsByContract } from './utils';
+import { State, STATE_PARTIAL_BASE } from './state';
 
 import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
@@ -13,9 +15,6 @@ import jsonSeaport from './constants/seaport.json';
 const seaportCfg = jsonSeaport as Record<string, { Seaport: string; DeployAfterNumber: number }>;
 import abiSeaport from './abis/seaport.json';
 import abiMonitor from './abis/NftTradeMonitor.json';
-
-import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
-import * as json5 from 'json5';
 import { program } from 'commander'; //https://github.com/tj/commander.js/blob/master/Readme_zh-CN.md
 program
   .requiredOption('-c,--config <文件路径>', 'JSON配置文件', './configures/watchSeaport.json')
@@ -23,6 +22,7 @@ program
   .option('-r,--rpc <RPC地址>', '替代内置RPC')
   .option('-p,--proxy <服务器地址>', '使用代理服务器');
 const CommandLineArgs = program.parse().opts();
+console.log(CommandLineArgs);
 const CONFIG = json5.parse(readFileSync(CommandLineArgs.config, 'utf-8'));
 //config配置文件中的可配置项目
 const CHAIN_NAME = CONFIG.args.CHAIN_NAME ? CONFIG.args.CHAIN_NAME : 'ethereum';
@@ -30,7 +30,7 @@ const WEDID_RPC_URL = CONFIG.args.WEDID_RPC_URL ? CONFIG.args.WEDID_RPC_URL : ch
 const BLOCK_BATCH_COUNT = CONFIG.args.BLOCK_BATCH_COUNT ? Number(CONFIG.args.BLOCK_BATCH_COUNT) : 256;
 const COMPACT_INTERVAL = CONFIG.args.COMPACT_INTERVAL ? Number(CONFIG.args.COMPACT_INTERVAL) : 1000 * 0.2;
 const RELAX_INTERVAL = CONFIG.args.RELAX_INTERVAL ? Number(CONFIG.args.RELAX_INTERVAL) : 1000 * 30;
-const STATE_FILE = CONFIG.args.STATE_FILE ? CONFIG.args.STATE_FILE : './state.json';
+const STATE_FILE = CONFIG.args.STATE_FILE ? CONFIG.args.STATE_FILE : './.state';
 const SEND_BATCH_COUNT = CONFIG.args.SEND_BATCH_COUNT ? Number(CONFIG.args.SEND_BATCH_COUNT) : 96;
 const ASYNC_NUMBER = CONFIG.args.ASYNC_NUMBER ? Number(CONFIG.args.ASYNC_NUMBER) : 8;
 const WAIT_CONFIRMATION_INTERVAL = CONFIG.args.WAIT_CONFIRMATION_INTERVAL
@@ -39,96 +39,21 @@ const WAIT_CONFIRMATION_INTERVAL = CONFIG.args.WAIT_CONFIRMATION_INTERVAL
 //如下是可用命令行参数替换的配置
 const MNEMONIC: string = CommandLineArgs.mnemonic ? CommandLineArgs.mnemonic : process.env.MNEMONIC;
 const RPC_URL = CommandLineArgs.rpc ? CommandLineArgs.rpc : chainsCfg[CHAIN_NAME].rpcUrls[0];
-const Get_ProviderWithProxy = (rpc: string) => {
-  const proxy = CommandLineArgs.proxy ? CommandLineArgs.proxy : undefined;
-  proxy && console.log(`❌ethers v5暂未支持代理，proxy选项暂时无效，当前proxy(${proxy})`);
-  return new ethers.providers.JsonRpcProvider(rpc);
-};
-interface STATE_CHAIN_TYPE {
-  last: number;
-  pendings?: Record<string, EVENT_TYPE>;
-}
 interface EVENT_TYPE {
   block: number;
   transactionHash: string;
   logIndex: number;
   event: any;
 }
-const saveState = async (network: string, data: STATE_CHAIN_TYPE) => {
-  const state = await loadState(network);
-  state[network] = data;
-  const file = openSync(STATE_FILE, 'w+');
-  writeSync(file, JSON.stringify(state));
-  closeSync(file);
-};
-const loadState = (network: string): Promise<Record<string, STATE_CHAIN_TYPE>> => {
-  return new Promise((resolve, reject) => {
-    access(STATE_FILE, constants.F_OK, (err) => {
-      if (!err) {
-        const file = openSync(STATE_FILE, 'r');
-        const state = JSON.parse(readFileSync(file, { encoding: 'utf-8' })) as Record<string, STATE_CHAIN_TYPE>;
-        closeSync(file);
-        resolve(state);
-      } else {
-        const result = {} as Record<string, STATE_CHAIN_TYPE>;
-        result[network] = { last: seaportCfg[network].DeployAfterNumber };
-        resolve(result);
-      }
-    });
-  });
-};
-const fetchEvents = async (
-  network: string,
-  latest: number,
-  block: number
-): Promise<{ toBlock: number; events: EVENT_TYPE[] }> => {
-  //block = 14950918; //用于测试block:14950918
-  const provider = Get_ProviderWithProxy(chainsCfg[network].rpcUrls[0]);
-  const seaport = new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider);
-  const topicFulfilled = seaport.interface.getEventTopic('OrderFulfilled');
-  let toBlock = block + BLOCK_BATCH_COUNT;
-  if (toBlock > latest) {
-    toBlock = latest;
-  }
-  const filter = {
-    address: seaport.address, //不传递address可以查询所有合约的数据
-    topics: [topicFulfilled],
-    fromBlock: block,
-    toBlock: toBlock,
-  };
-  logger.debug(`fetchEvents(${network}) starting at [${block}-${toBlock}]`);
-  const hitLogs = await provider.getLogs(filter);
-  logger.debug(`fetchEvents(${network}) at [${block}-${toBlock}],hit logs(${hitLogs.length})`);
-  const events: EVENT_TYPE[] = [];
-  hitLogs.forEach((log) => {
-    //const evt = seaport.interface.decodeEventLog('OrderFulfilled', log.data, log.topics);
-    const desc = seaport.interface.parseLog(log);
-    if (desc.name == 'OrderFulfilled') {
-      const evt = {
-        block: log.blockNumber,
-        transactionHash: log.transactionHash,
-        logIndex: log.logIndex,
-        event: {
-          orderHash: desc.args.orderHash,
-          offerer: desc.args.offerer,
-          zone: desc.args.zone,
-          recipient: desc.args.recipient,
-          offer: desc.args.offer,
-          consideration: desc.args.consideration,
-        },
-      };
-      events.push(evt);
-    }
-  });
-
-  return { toBlock, events };
+const getStateKey = (transactionHash: string, logIndex: number) => {
+  return `${transactionHash}#${logIndex}`;
 };
 const waitAsyncTrans = async (
   queue: { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[]
 ): Promise<{ totals: EVENT_TYPE[]; errors: EVENT_TYPE[] }> => {
   logger.debug(`waitAsyncTrans:queue(${queue.length})`);
   return new Promise((resolve, reason) => {
-    const provider = Get_ProviderWithProxy(WEDID_RPC_URL);
+    const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
     let complete = 0;
     let errors = [] as EVENT_TYPE[];
     let totals = [] as EVENT_TYPE[];
@@ -163,8 +88,8 @@ const waitAsyncTrans = async (
     }
   });
 };
-const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVENT_TYPE[]) => {
-  const provider = Get_ProviderWithProxy(WEDID_RPC_URL);
+const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, events: EVENT_TYPE[]) => {
+  const provider = Get_ProviderWithProxy(WEDID_RPC_URL, CommandLineArgs.proxy);
   const wallet = ethers.Wallet.fromMnemonic(MNEMONIC).connect(provider);
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   logger.info(
@@ -172,43 +97,34 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
       await wallet.getBalance()
     )},tranCount(${await wallet.getTransactionCount()})`
   );
+  logger.warn(`sendToChain:events has ${events.length},pendings has ${state.pendingsLength}`);
   //先保存本次尚未处理的交易
-  if (!state.pendings) state.pendings = {};
   for (const evt of events) {
-    state.pendings[evt.transactionHash] = { ...evt };
+    await state.put(getStateKey(evt.transactionHash, evt.logIndex), { ...evt });
   }
-  if (events.length > 0) saveState(network, state);
-  //添加到队列
-  for (const evt of events) {
-    QUEUE_TRANS.push({ ...evt });
-  }
-  logger.warn(`sendToChain:QUEUE_TRANS has ${QUEUE_TRANS.length}`);
   const asyncQueue = [] as { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[];
   //处理队列
-  while (QUEUE_TRANS.length >= SEND_BATCH_COUNT) {
-    const orders = [];
+  while (state.pendingsLength >= SEND_BATCH_COUNT) {
+    let verified = 0;
     const sendOrders = [];
     const bar = new cliProgress.SingleBar({
-      format: 'checking containsTransactions [{bar}] {percentage}% | {value}/{total} | ETA: {eta}s',
+      format: 'checking containsEvent [{bar}] {percentage}% | {value}/{total} | ETA: {eta}s',
     });
-    bar.start(QUEUE_TRANS.length, 0);
+    bar.start(state.pendingsLength, 0);
     let progress = 0;
     do {
-      const evt = QUEUE_TRANS.pop();
+      const evt = await state.pop();
       if (evt) {
-        orders.push(evt);
-        const existent = await monitor.containsTransaction(chainsCfg[network].chainId, evt.transactionHash);
+        const existent = await monitor.containsEvent(chainsCfg[network].chainId, evt.transactionHash, evt.logIndex);
         if (!existent) sendOrders.push(evt);
-        else delete state.pendings[evt.transactionHash];
+        else await state.del(getStateKey(evt.transactionHash, evt.logIndex));
+        verified++;
         bar.update(++progress);
       }
-    } while (sendOrders.length < SEND_BATCH_COUNT && QUEUE_TRANS.length > 0);
+    } while (sendOrders.length < SEND_BATCH_COUNT && state.pendingsLength > 0);
     bar.setTotal(progress);
     bar.stop();
-    saveState(network, state);
-    logger.warn(
-      `sendToChain:orders(${orders.length}),sendOrders(${sendOrders.length}),QUEUE_TRANS(${QUEUE_TRANS.length})`
-    );
+    logger.warn(`sendToChain:verified(${verified}),sendOrders(${sendOrders.length}),pendings(${state.pendingsLength})`);
     //发送交易
     if (sendOrders.length > 0) {
       let gasLimit;
@@ -236,10 +152,7 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
             chainsCfg[network].chainId,
             sendOrders.map((v) => v.transactionHash),
             sendOrders.map((v) => v.logIndex),
-            {
-              gasLimit,
-              gasPrice,
-            }
+            { gasLimit, gasPrice }
           );
           logger.debug(
             `pending transaction(${tx.hash}),nonce(${
@@ -258,31 +171,28 @@ const sendToChain = async (network: string, state: STATE_CHAIN_TYPE, events: EVE
       }
     }
     //异步等待处理
-    if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || QUEUE_TRANS.length < SEND_BATCH_COUNT)) {
+    if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || state.pendingsLength < SEND_BATCH_COUNT)) {
       const { totals, errors } = await waitAsyncTrans([...asyncQueue]);
       asyncQueue.splice(0);
       //清理本地存储
       for (const evt of totals) {
         if (errors.findIndex((v) => evt.transactionHash == v.transactionHash) < 0)
-          delete state.pendings[evt.transactionHash];
+          state.del(getStateKey(evt.transactionHash, evt.logIndex));
       }
-      saveState(network, state);
     }
   }
+  state.revertPop();
+  logger.info(`end sendToChain: pendings has ${state.pendingsLength}`);
 };
-const QUEUE_TRANS = [] as EVENT_TYPE[];
 const main = async (network: string) => {
   let timeoutHandler;
-  const state = (await loadState(network))[network];
-  if (state.pendings) {
-    for (const key of Object.keys(state.pendings)) {
-      const evt = state.pendings[key];
-      QUEUE_TRANS.push({ ...evt });
-    }
-  }
-  const provider = Get_ProviderWithProxy(RPC_URL);
+  const state = new State(network, STATE_FILE, { last: seaportCfg[network].DeployAfterNumber });
+  await state.refresh();
+  const provider = Get_ProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
   let latest = await provider.getBlockNumber();
-  logger.info(`main starting:network:${network},latest(${latest}),QUEUE_TRANS(${QUEUE_TRANS.length}).`);
+  logger.info(
+    `main starting:network(${network}),latest(${latest}),last(${state.last}),pendings(${state.pendingsLength}).`
+  );
   const sleep = (ms: number) => {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
@@ -290,12 +200,35 @@ const main = async (network: string) => {
   };
   const procLoop = async () => {
     try {
-      const { toBlock, events } = await fetchEvents(network, latest, state.last);
-      if (events.length > 0 || QUEUE_TRANS.length > 0) {
-        await sendToChain(network, state, events);
+      const seaport = new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider);
+      const { toBlock, logs } = await fetchEventsByContract(
+        seaport,
+        'OrderFulfilled',
+        logger,
+        BLOCK_BATCH_COUNT,
+        latest,
+        state.last
+      );
+      if (logs.length > 0 || state.pendingsLength > 0) {
+        await sendToChain(
+          network,
+          state,
+          logs.map((v) => ({
+            block: v.log.blockNumber,
+            transactionHash: v.log.transactionHash,
+            logIndex: v.log.logIndex,
+            event: {
+              orderHash: v.desc.args.orderHash,
+              offerer: v.desc.args.offerer,
+              zone: v.desc.args.zone,
+              recipient: v.desc.args.recipient,
+              offer: v.desc.args.offer,
+              consideration: v.desc.args.consideration,
+            },
+          }))
+        );
       }
-      state.last = toBlock;
-      saveState(network, state);
+      await state.setLast(toBlock + 1);
       if (toBlock >= latest) {
         logger.warn(
           `procLoop:Out of range,toBlock(${toBlock}),latest(${latest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
@@ -304,7 +237,7 @@ const main = async (network: string) => {
         latest = await provider.getBlockNumber();
       }
     } catch (err) {
-      logger.error(`procLoop err:${(err as Error).message}`);
+      logger.error(`procLoop err:${(err as Error).message},${(err as Error).stack}`);
     } finally {
       timeoutHandler = setTimeout(procLoop, COMPACT_INTERVAL);
     }

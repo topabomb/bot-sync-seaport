@@ -80,13 +80,21 @@ contract NftTradeMonitor is ExecutorBase, IMonitor {
         }
     }
 
-    function containsTransaction(uint chainId, bytes32 tranHash) public view override returns (bool existent) {
-        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash));
+    function containsEvent(
+        uint chainId,
+        bytes32 tranHash,
+        uint logIndex
+    ) public view override returns (bool existent) {
+        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash, logIndex));
         existent = EnumerableSet.contains(tranHash_indexes, localTranHash);
     }
 
-    function _addTranHash(uint chainId, bytes32 tranHash) internal returns (bool) {
-        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash));
+    function _addTranHash(
+        uint chainId,
+        bytes32 tranHash,
+        uint logIndex
+    ) internal returns (bool) {
+        bytes32 localTranHash = keccak256(abi.encodePacked(chainId, tranHash, logIndex));
         return EnumerableSet.add(tranHash_indexes, localTranHash);
     }
 
@@ -115,7 +123,7 @@ contract NftTradeMonitor is ExecutorBase, IMonitor {
         bytes32 tranHash,
         uint logIndex
     ) public override onlyExecutorOrOwner {
-        if (_addTranHash(chainId, tranHash)) {
+        if (_addTranHash(chainId, tranHash, logIndex)) {
             (ParamsNftItem[] memory paramTokens, uint length) = _processSeaportOrderFulfilled(order, chainId);
             //逐一处理nft资产
             uint lastContractIdx = EnumerableMap.length(contract_indexes);
@@ -147,7 +155,7 @@ contract NftTradeMonitor is ExecutorBase, IMonitor {
     ) public onlyExecutorOrOwner {
         require(tranHashs.length == orders.length && logIndexs.length == orders.length && orders.length > 0, "err args");
         for (uint i = 0; i < orders.length; i++) {
-            if (!containsTransaction(chainId, tranHashs[i])) {
+            if (!containsEvent(chainId, tranHashs[i], logIndexs[i])) {
                 seaportOrderFulfilled(orders[i], chainId, tranHashs[i], logIndexs[i]);
             }
         }

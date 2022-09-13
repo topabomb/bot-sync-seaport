@@ -4,3 +4,4 @@ logs
 *.pem
 *.env
 configures
+.state

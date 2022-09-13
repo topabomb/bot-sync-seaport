@@ -14,7 +14,11 @@ interface IMonitor {
         uint tokenId
     ) external view returns (uint);
 
-    function containsTransaction(uint chainId, bytes32 tranHash) external view returns (bool existent);
+    function containsEvent(
+        uint chainId,
+        bytes32 tranHash,
+        uint logIndex
+    ) external view returns (bool existent);
 
     function seaportOrderFulfilled(
         ParamsOrderFulfilled calldata order,
