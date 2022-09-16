@@ -5,6 +5,7 @@ import log4js_main from './constants/log4js_main.json';
 configure(log4js_main);
 const logger = getLogger();
 import { ethers } from 'ethers';
+import * as json5 from 'json5';
 
 import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
@@ -13,6 +14,7 @@ import abiMonitor from './abis/NftTradeMonitor.json';
 import { getProviderWithProxy } from './utils';
 
 import { program } from 'commander'; //https://github.com/tj/commander.js/blob/master/Readme_zh-CN.md
+import { readFileSync, writeFileSync } from 'fs';
 program
   .option('-m,--mnemonic <助记词>', '替代.env中的助记词')
   .option('-r,--wedid-rpc <RPC地址>', '替代内置RPC', chainsCfg['wedid_dev'].rpcUrls[0])
@@ -52,4 +54,10 @@ const main = async (network: string) => {
     //console.log(`wedid(${latest}:${timestamp}):${network}原交易：${chainId.toString()}#${tranHash}#${logIndex}`);
   });
 };
+/*
+const deploymentsJson = json5.parse(
+  readFileSync('contracts/deployments/wedid_dev/NftTradeMonitor_Proxy.json', 'utf-8')
+);
+writeFileSync('./temp_input.json', deploymentsJson.metadata);
+*/
 void main('ethereum');

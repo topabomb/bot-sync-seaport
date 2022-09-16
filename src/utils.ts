@@ -26,13 +26,13 @@ const fetchEventsByContract = async (
   if (toBlock > latest) {
     toBlock = latest;
   }
+  logger.debug(`fetchEvents(${eventName}) starting at [${block}-${toBlock}]`);
   const filter = {
     address: instance.address, //不传递address可以查询所有合约的数据
     topics: [topicFulfilled],
     fromBlock: block,
     toBlock: toBlock,
   };
-  //logger.debug(`fetchEvents(${eventName}) starting at [${block}-${toBlock}]`);
   const hitLogs = await instance.provider.getLogs(filter);
   logger.info(`fetchEvents(${eventName}) at [${block}-${toBlock}],hit logs(${hitLogs.length})`);
   const logs: { log: ethers.providers.Log; desc: ethers.utils.LogDescription }[] = [];

@@ -20,7 +20,8 @@ program
   .requiredOption('-c,--config <文件路径>', 'JSON配置文件', './configures/watchSeaport.json')
   .option('-m,--mnemonic <助记词>', '替代.env中的助记词')
   .option('-r,--rpc <RPC地址>', '替代内置RPC')
-  .option('-p,--proxy <服务器地址>', '使用代理服务器');
+  .option('-p,--proxy <服务器地址>', '使用代理服务器')
+  .option('-b,--block <强制起始区块>', '使用指定区块进行启动');
 const CommandLineArgs = program.parse().opts();
 const CONFIG = json5.parse(readFileSync(CommandLineArgs.config, 'utf-8'));
 //config配置文件中的可配置项目
@@ -153,6 +154,7 @@ const main = async (network: string) => {
   let timeoutHandler;
   const state = new State(network, STATE_FILE, { last: seaportCfg[network].DeployAfterNumber });
   await state.refresh();
+  if (CommandLineArgs.block) await state.setLast(Number(CommandLineArgs.block));
   const provider = getProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
   let latest = await provider.getBlockNumber();
   console.warn(CommandLineArgs);
