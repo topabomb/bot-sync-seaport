@@ -2,14 +2,17 @@ import { ethers, logger } from 'ethers';
 import { Logger } from 'log4js';
 import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
 import { Level } from 'level';
-const providerCache = {} as Record<string, ethers.providers.Provider>;
-const getProviderWithProxy = (rpc: string, proxy?: string, newInstance?: boolean) => {
+const providerCache = {} as Record<string, { timestamp: number; instance: ethers.providers.Provider }>;
+const getProviderWithProxy = (rpc: string, proxy?: string, newInstance?: boolean): ethers.providers.Provider => {
   proxy && console.log(`❌ethers v5暂未支持代理，proxy选项暂时无效，当前proxy(${proxy})`);
   let result;
   if (newInstance) result = new ethers.providers.JsonRpcProvider(rpc);
   else {
-    providerCache[rpc] ||= new ethers.providers.JsonRpcProvider(rpc);
-    result = providerCache[rpc];
+    //仅在60秒内复用连接
+    if (!providerCache[rpc] || providerCache[rpc].timestamp < Date.now() - 60000) {
+      providerCache[rpc] = { timestamp: Date.now(), instance: new ethers.providers.JsonRpcProvider(rpc) };
+    }
+    result = providerCache[rpc].instance;
   }
   return result;
 };
@@ -33,14 +36,21 @@ const fetchEventsByContract = async (
     fromBlock: block,
     toBlock: toBlock,
   };
-  const hitLogs = await instance.provider.getLogs(filter);
-  logger.info(`fetchEvents(${eventName}) at [${block}-${toBlock}],hit logs(${hitLogs.length})`);
   const logs: { log: ethers.providers.Log; desc: ethers.utils.LogDescription }[] = [];
-  hitLogs.forEach((log) => {
-    //const evt = seaport.interface.decodeEventLog('OrderFulfilled', log.data, log.topics);
-    const desc = instance.interface.parseLog(log);
-    if (desc.name == eventName) logs.push({ log, desc });
-  });
+  try {
+    const hitLogs = await instance.provider.getLogs(filter);
+    logger.info(`fetchEvents(${eventName}) at [${block}-${toBlock}],hit logs(${hitLogs.length})`);
+    hitLogs?.forEach((log) => {
+      //const evt = seaport.interface.decodeEventLog('OrderFulfilled', log.data, log.topics);
+      const desc = instance.interface.parseLog(log);
+      if (desc.name == eventName) logs.push({ log, desc });
+    });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message.includes('One of the blocks specified in filter')) {
+      throw new Error('服务端异常：One of the blocks specified in filter，可以尝试重连rpc端点');
+    } else throw err;
+  }
   return { toBlock, logs };
 };
 const waitAsyncTrans = async <T>(

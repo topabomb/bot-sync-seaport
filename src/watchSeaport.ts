@@ -65,7 +65,7 @@ const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, ev
   }
   const asyncQueue = [] as { tx: ethers.providers.TransactionResponse; pendingOrders: EVENT_TYPE[] }[];
   //处理队列
-  while (state.pendingsLength >= SEND_BATCH_COUNT) {
+  while (state.pendingsLength > 0) {
     let verified = 0;
     const sendOrders = [];
     const bar = new cliProgress.SingleBar({
@@ -132,7 +132,7 @@ const sendToChain = async (network: string, state: State<STATE_PARTIAL_BASE>, ev
       }
     }
     //异步等待处理
-    if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || state.pendingsLength < SEND_BATCH_COUNT)) {
+    if (asyncQueue.length > 0 && (asyncQueue.length >= ASYNC_NUMBER || state.pendingsLength <= 0)) {
       const { totals, errors } = await waitAsyncTrans<EVENT_TYPE>(
         [...asyncQueue],
         logger,
