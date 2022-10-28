@@ -9,5 +9,8 @@ program
   })
   .command('report', '查看wedid chain上的合约状态', {
     executableFile: 'monitorReport',
+  })
+  .command('watchNawEvaluationClose', '监控naw的evaluationClose事件执行结算', {
+    executableFile: 'watchNawEvaluationClose',
   });
 program.parse();

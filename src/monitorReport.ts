@@ -10,6 +10,7 @@ import * as json5 from 'json5';
 import jsonChains from './constants/chains.json';
 const chainsCfg = jsonChains as Record<string, { rpcUrls: string[]; chainId: string }>;
 import abiMonitor from './abis/NftTradeMonitor.json';
+import abiPolyWrapper from './abis/PolyWrapper.json';
 
 import { getProviderWithProxy } from './utils';
 
@@ -38,6 +39,13 @@ const main = async (network: string) => {
   const monitor = new ethers.Contract(abiMonitor.address, abiMonitor.abi, provider).connect(wallet);
   const logs = await monitor.queryFilter('SeaportOrderFulfilled', -1, 'latest');
   console.log(logs.length, monitor.interface.getSighash(monitor.interface.getEvent('SeaportOrderFulfilled'))); //0x9d9af8e3
+
+  const polyWrapper = new ethers.Contract('0x81910675dbaf69dee0fd77570bfd07f8e436386a', abiPolyWrapper);
+  console.log(
+    'PolyWrapperLock sighash',
+    polyWrapper.interface.getSighash(polyWrapper.interface.getEvent('PolyWrapperLock'))
+  );
+
   if (logs.length > 0) console.log(JSON.stringify({ ...monitor.interface.parseLog(logs[0]).args }));
   let latest = await provider.getBlockNumber();
   let timestamp = (await provider.getBlock('latest')).timestamp;

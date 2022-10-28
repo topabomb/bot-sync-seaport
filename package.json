@@ -11,6 +11,8 @@
     "start": "node build/index.js",
     "start:watch:seaport": "node build/index.js watch_seaport --rpc https://eth-mainnet.nodereal.io/v1/32bdddf6055844b48f427d6fa3651dce",
     "start:report": "node build/index.js report --wedid-rpc http://wedid-test-rpc.weero.net/",
+    "start:watch:NawEvaluationClose": "npm run build && node build/index.js watchNawEvaluationClose",
+    "matchWhiteList": "ts-node src/matchWhiteList.ts --file test.csv",
     "lint": "eslint . --ext .ts"
   },
   "author": "Topabomb",
@@ -34,6 +36,7 @@
     "bignumber.js": "^9.0.2",
     "cli-progress": "^3.11.2",
     "commander": "^9.4.0",
+    "csv": "^6.2.1",
     "dotenv": "^16.0.1",
     "ethers": "^5.7.0",
     "json5": "^2.2.1",

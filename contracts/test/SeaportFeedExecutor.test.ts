@@ -71,7 +71,7 @@ describe('SeaportFeedExecutor主流程', () => {
       }
       await (await feed.finishRound(chainId, nftAddress)).wait();
       const roundInfo = await feed.latestRoundData(chainId, nftAddress);
-      console.log(roundInfo);
+      //console.log(roundInfo);
       expect(roundInfo.prices[0].swapAmount).to.equal(swapAmount.mul('3'));
       expect(await monitor.getContractCount()).to.equal(1);
       expect(await monitor.getItemCount()).to.equal(3);

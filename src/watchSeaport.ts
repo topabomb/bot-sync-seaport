@@ -155,13 +155,13 @@ const main = async (network: string) => {
   const state = new State(network, STATE_FILE, { last: seaportCfg[network].DeployAfterNumber });
   await state.refresh();
   if (CommandLineArgs.block) await state.setLast(Number(CommandLineArgs.block));
-  const provider = getProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
-  let latest = await provider.getBlockNumber();
+  let latest = await getProviderWithProxy(RPC_URL, CommandLineArgs.proxy).getBlockNumber();
   console.warn(CommandLineArgs);
   logger.info(
     `main starting:network(${network}),latest(${latest}),last(${state.last}),pendings(${state.pendingsLength}).`
   );
   const procLoop = async () => {
+    const provider = getProviderWithProxy(RPC_URL, CommandLineArgs.proxy);
     try {
       const { toBlock, logs } = await fetchEventsByContract(
         new ethers.Contract(seaportCfg[network].Seaport, abiSeaport, provider),
@@ -191,9 +191,9 @@ const main = async (network: string) => {
         );
       }
       await state.setLast(toBlock + 1);
-      if (toBlock >= latest) {
+      if (state.last >= latest) {
         logger.warn(
-          `procLoop:Out of range,toBlock(${toBlock}),latest(${latest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
+          `procLoop:Out of range,last(${state.last}),latest(${latest}),sleep(${RELAX_INTERVAL - COMPACT_INTERVAL})`
         );
         await Sleep(RELAX_INTERVAL - COMPACT_INTERVAL);
         latest = await provider.getBlockNumber();

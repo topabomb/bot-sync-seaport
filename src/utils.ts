@@ -1,7 +1,5 @@
-import { ethers, logger } from 'ethers';
+import { ethers } from 'ethers';
 import { Logger } from 'log4js';
-import { openSync, writeSync, readFileSync, access, constants, closeSync } from 'fs';
-import { Level } from 'level';
 const providerCache = {} as Record<string, { timestamp: number; instance: ethers.providers.Provider }>;
 const getProviderWithProxy = (rpc: string, proxy?: string, newInstance?: boolean): ethers.providers.Provider => {
   proxy && console.log(`❌ethers v5暂未支持代理，proxy选项暂时无效，当前proxy(${proxy})`);
@@ -10,12 +8,25 @@ const getProviderWithProxy = (rpc: string, proxy?: string, newInstance?: boolean
   else {
     //仅在60秒内复用连接
     if (!providerCache[rpc] || providerCache[rpc].timestamp < Date.now() - 60000) {
+      console.log(`rpc(${rpc})更换为新的对象实例.`);
       providerCache[rpc] = { timestamp: Date.now(), instance: new ethers.providers.JsonRpcProvider(rpc) };
     }
     result = providerCache[rpc].instance;
   }
   return result;
 };
+class RpcServerException extends Error {
+  protected code: number;
+  protected detail: string;
+  constructor(_detail = 'unknow', _code = 500) {
+    //特殊约定，505需要重启
+    super(`RpcServerException:code(${_code}),detail(${_detail})`);
+    this.code = _code;
+    this.detail = _detail;
+  }
+  public getCode = () => this.code;
+  public needReboot = () => this.code == 505;
+}
 const fetchEventsByContract = async (
   instance: ethers.Contract,
   eventName: string,
@@ -26,9 +37,8 @@ const fetchEventsByContract = async (
 ): Promise<{ toBlock: number; logs: { log: ethers.providers.Log; desc: ethers.utils.LogDescription }[] }> => {
   const topicFulfilled = instance.interface.getEventTopic(eventName);
   let toBlock = block + batch_count;
-  if (toBlock > latest) {
-    toBlock = latest;
-  }
+  if (toBlock > latest) toBlock = latest;
+  if (block > toBlock) block = toBlock;
   logger.debug(`fetchEvents(${eventName}) starting at [${block}-${toBlock}]`);
   const filter = {
     address: instance.address, //不传递address可以查询所有合约的数据
@@ -48,7 +58,7 @@ const fetchEventsByContract = async (
   } catch (error) {
     const err = error as Error;
     if (err.message.includes('One of the blocks specified in filter')) {
-      throw new Error('服务端异常：One of the blocks specified in filter，可以尝试重连rpc端点');
+      throw new RpcServerException('服务端异常：One of the blocks specified in filter，可以尝试重连rpc端点', 505);
     } else throw err;
   }
   return { toBlock, logs };
@@ -103,4 +113,4 @@ const Sleep = (ms: number) => {
     setTimeout(resolve, ms);
   });
 };
-export { getProviderWithProxy, fetchEventsByContract, waitAsyncTrans, Sleep };
+export { getProviderWithProxy, fetchEventsByContract, RpcServerException, waitAsyncTrans, Sleep };

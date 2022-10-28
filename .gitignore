@@ -5,3 +5,4 @@ logs
 *.env
 configures
 .state
+.watch*

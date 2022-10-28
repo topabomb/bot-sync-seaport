@@ -10,10 +10,10 @@
     "datelog": {
       "type": "dateFile",
       "filename": "./logs/log",
-      "backups": 7,
+      "backups": 365,
       "pattern": "yyyy-MM-dd.log",
       "alwaysIncludePattern": true,
-      "compress": true
+      "compress": false
     }
   },
   "categories": {

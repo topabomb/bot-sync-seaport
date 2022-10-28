@@ -2,7 +2,7 @@
   "ethereum": {
     "chainId": "0x1",
     "chainName": "ETH Mainnet",
-    "rpcUrls": ["https://eth-mainnet.g.alchemy.com/v2/KdzaJDw7T0CIlJEC6LQ3nwAYkMiPN4oU"],
+    "rpcUrls": ["https://eth-mainnet.nodereal.io/v1/8c8c4116d6ed492282786aada4a3ae6b"],
     "blockExplorerUrls": ["https://etherscan.io/"],
     "iconUrls": [],
     "nativeCurrency": {

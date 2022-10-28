@@ -27,6 +27,7 @@
     "hardhat-deploy": "^0.11.11",
     "hardhat-gas-reporter": "^1.0.8",
     "hardhat-tracer": "^1.1.0-rc.6",
+    "merkletreejs": "^0.2.32",
     "moment-timezone": "^0.5.34",
     "node-fetch": "^2.6.7",
     "prettier-plugin-solidity": "^1.0.0-dev.22",

@@ -17,7 +17,7 @@ const getMnemonic = (networkName?: string) => {
   return mnemonic;
 };
 const accounts = (chain?: string) => {
-  return { mnemonic: getMnemonic(chain) };
+  return { mnemonic: getMnemonic(chain), count: 2000 };
 };
 const config: HardhatUserConfig = {
   solidity: {
@@ -49,6 +49,9 @@ const config: HardhatUserConfig = {
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS ? true : false,
+  },
+  mocha: {
+    timeout: 120000,
   },
 };
 
